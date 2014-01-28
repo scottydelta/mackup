@@ -519,10 +519,71 @@ UNINSTALL_MODE = 'uninstall'
 PLATFORM_DARWIN = 'Darwin'
 PLATFORM_LINUX = 'Linux'
 
+# Directory containing the application configs
+APPS_DIR = 'applications'
+
 
 ###########
 # Classes #
 ###########
+
+
+class ApplicationsDatabase(object):
+    """Database containing all the configured applications"""
+
+    def __init__(self):
+        """
+        Create a ApplicationsDatabase instance
+        """
+        # Configure the config parser
+        apps_dir = '{}/{}'.format(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            APPS_DIR)
+
+        config_files = set()
+        for filename in os.listdir(apps_dir):
+            if filename.endswith(".cfg"):
+                config_files.add(filename)
+
+        self.apps = dict()
+
+        for config_file in config_files:
+            config = configparser.SafeConfigParser(allow_no_value=True)
+            config.optionxform=str
+            config_file_path = '{}/{}'.format(apps_dir, config_file)
+            if config.read(config_file_path):
+                app_name = config_file[:-len('.cfg')]
+                self.apps[app_name] = dict()
+                app_pretty_name = config.get('application', 'name')
+                self.apps[app_name]['name'] = app_pretty_name
+                self.apps[app_name]['configuration_files'] = set()
+                if config.has_section('configuration_files'):
+                    for cf in config.options('configuration_files'):
+                        self.apps[app_name]['configuration_files'].add(cf)
+
+    def get_name(self, name):
+        """
+        Return the fancy name of an application
+
+        Args:
+            name (str)
+
+        Returns:
+            str
+        """
+        return self.apps[name]['name']
+
+    def get_files(self, name):
+        """
+        Return the list of config files of an application
+
+        Args:
+            name (str)
+
+        Returns:
+            list(str)
+        """
+        return list(self.apps[name]['configuration_files'])
 
 
 class ApplicationProfile(object):
@@ -943,7 +1004,7 @@ def parse_cmdline_args():
     parser = argparse.ArgumentParser(
         description=("Mackup {}\n"
                      "Keep your application settings in sync.\n"
-                     "Copyright (C) 2013 Laurent Raufaste <http://glop.org/>\n"
+                     "Copyright (C) 2013-2014 Laurent Raufaste <http://glop.org/>\n"
                      .format(VERSION)),
         epilog=epilog,
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1201,3 +1262,36 @@ def main():
 
     # Delete the tmp folder
     mackup.clean_temp_folder()
+
+
+def try_load_config():
+    print "Let's go"
+    config = configparser.SafeConfigParser(allow_no_value=True)
+    config.optionxform=str
+    path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))+'/applications/application-name.cfg'
+    if config.read(path):
+        if config.has_section('configuration_files'):
+            for opt in config.options('configuration_files'):
+                print 'name: '+opt
+                if config.get('configuration_files', opt):
+                    print 'value: '+config.get('configuration_files', opt)
+    if config.has_section('application'):
+        for opt in config.options('application'):
+            print 'name: '+opt
+            if config.get('application', opt):
+                print 'value: '+config.get('application', opt)
+
+def migrate_database():
+    for app in SUPPORTED_APPS:
+        app_name = app.replace(' ', '-').replace('!', '').lower()
+        filepath = 'applications/{}.cfg'.format(app_name)
+        lines = ['[application]'+"\n",
+                 "name = {}\n".format(app),
+                 "\n",
+                 '[configuration_files]'+"\n",
+        ]
+        for f in SUPPORTED_APPS[app]:
+            lines.append(f+"\n")
+
+        with open(filepath, 'w') as f:
+            f.writelines(lines)

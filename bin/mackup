@@ -16,4 +16,13 @@ except ImportError:
 
 
 if __name__ == '__main__':
-    mackup.main.main()
+    # mackup.main.main()
+    # mackup.main.try_load_config()
+    # mackup.main.migrate_database()
+    app_db = mackup.main.ApplicationsDatabase()
+    print app_db.apps
+    for app in app_db.apps:
+        print app
+        print app_db.get_name(app)
+        print app_db.get_files(app)
+        print '-----'
